@@ -17,20 +17,19 @@
       </q-card>
     </q-dialog>
 
-
-
-    <q-list bordered>
-      <q-item v-for="article in articles" :key="article.id">
-        <q-item-section>
-          <div>{{ article.title }}</div>
-          <div>{{ article.releaseDate }}</div>
-        </q-item-section>
-        <q-item-section side>
-          <q-btn flat icon="edit" @click="openDialog(article)" />
-          <q-btn flat icon="delete" @click="deleteArticle(article.id)" />
-        </q-item-section>
-      </q-item>
-    </q-list>
+    <q-table
+      title="Treats"
+      :rows="articles"
+      :columns="columns"
+      row-key="name"
+    >
+      <template v-slot:body-cell-actions="props">
+        <q-td :props="props">
+          <q-btn flat icon="edit" @click="openDialog(props.row)" />
+          <q-btn flat icon="delete" @click="deleteArticle(props.row.article_id)" />
+        </q-td>
+      </template>
+    </q-table>
   </div>
 </template>
 
@@ -39,17 +38,27 @@ import { defineComponent, ref, computed, onMounted } from 'vue';
 import { useQuasar } from 'quasar';
 
 interface Article {
-  id: number;
+  article_id: number;
   title: string;
   content: string;
-  releaseDate: string;
 }
-
-
 
 export default defineComponent({
   name: 'ArticleList',
   setup() {
+    const columns = [
+      {
+        name: 'name',
+        required: true,
+        label: 'id',
+        align: 'left' as const,
+        field: (row: { article_id: number; }) => row.article_id,
+        sortable: true
+      },
+      { name: 'title', label: 'Title', field: 'title', sortable: true },
+      { name: 'content', label: 'Content', field: 'content', sortable: true },
+      { name: 'actions', label: 'Actions', field: 'actions', sortable: false }
+    ];
     const $q = useQuasar();
 
     // Reactive state
@@ -74,21 +83,21 @@ export default defineComponent({
 
     // Open dialog for adding/editing
     const openDialog = (article: Article | null) => {
-  editingArticle.value = article
-    ? { ...article }
-    : { id: 0, title: '', content: '', releaseDate: (new Date().toISOString().split('T')[0] || '') };
-  dialog.value = true;
-};
+      editingArticle.value = article
+        ? { ...article }
+        : { article_id: 0, title: '', content: ''};
+      dialog.value = true;
+    };
 
     // Save article (create/update)
     const saveArticle = () => {
       if (!editingArticle.value) return;
 
-      if (editingArticle.value.id) {
-        articles.value = articles.value.map((a) => (a.id === editingArticle.value?.id ? editingArticle.value : a));
+      if (editingArticle.value.article_id) {
+        articles.value = articles.value.map((a) => (a.article_id === editingArticle.value?.article_id ? editingArticle.value : a));
         $q.notify({ type: 'positive', message: 'Article updated successfully' });
       } else {
-        editingArticle.value.id = new Date().getTime();
+        editingArticle.value.article_id = new Date().getTime();
         articles.value.push(editingArticle.value);
         $q.notify({ type: 'positive', message: 'Article added successfully' });
       }
@@ -97,15 +106,15 @@ export default defineComponent({
 
     // Delete an article
     const deleteArticle = (id: number) => {
-      articles.value = articles.value.filter((a) => a.id !== id);
+      articles.value = articles.value.filter((a) => a.article_id !== id);
       $q.notify({ type: 'negative', message: 'Article deleted' });
     };
 
     // Fetch articles (mocked)
     const fetchArticles = () => {
       articles.value = [
-        { id: 1, title: 'Article 1', content: 'Content 1', releaseDate: '2024-01-15' },
-        { id: 2, title: 'Article 2', content: 'Content 2', releaseDate: '2024-02-20' },
+        { article_id: 1, title: 'Article 1', content: 'Content 1'},
+        { article_id: 2, title: 'Article 2', content: 'Content 2'},
       ];
     };
 
@@ -120,7 +129,8 @@ export default defineComponent({
       editableContent,
       openDialog,
       saveArticle,
-      deleteArticle
+      deleteArticle,
+      columns
     };
   },
 });
