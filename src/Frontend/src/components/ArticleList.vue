@@ -36,16 +36,14 @@
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from 'vue';
 import { useQuasar } from 'quasar';
-
-interface Article {
-  article_id: number;
-  title: string;
-  content: string;
-}
+import type { Article } from "../models/Article";
+import { fetchArticles, addArticle, updateArticle, deleteArticle } from '../api/articles.js';
 
 export default defineComponent({
   name: 'ArticleList',
   setup() {
+    const $q = useQuasar();
+
     const columns = [
       {
         name: 'name',
@@ -59,7 +57,6 @@ export default defineComponent({
       { name: 'content', label: 'Content', field: 'content', sortable: true },
       { name: 'actions', label: 'Actions', field: 'actions', sortable: false }
     ];
-    const $q = useQuasar();
 
     // Reactive state
     const articles = ref<Article[]>([]);
@@ -90,37 +87,54 @@ export default defineComponent({
     };
 
     // Save article (create/update)
-    const saveArticle = () => {
+    const saveArticleHandler = async () => {
       if (!editingArticle.value) return;
 
-      if (editingArticle.value.article_id) {
-        articles.value = articles.value.map((a) => (a.article_id === editingArticle.value?.article_id ? editingArticle.value : a));
-        $q.notify({ type: 'positive', message: 'Article updated successfully' });
-      } else {
-        editingArticle.value.article_id = new Date().getTime();
-        articles.value.push(editingArticle.value);
-        $q.notify({ type: 'positive', message: 'Article added successfully' });
+      // Check if title and content exist
+      if (!editingArticle.value.title || !editingArticle.value.content) {
+        $q.notify({ message: 'Title and content are required' , color: 'negative' });
+        return;
       }
-      dialog.value = false;
+
+      try {
+        if (editingArticle.value.article_id) {
+          await updateArticle(editingArticle.value);
+          articles.value = articles.value.map((a) => (a.article_id === editingArticle.value?.article_id ? editingArticle.value : a));
+          $q.notify({ message: 'Article updated successfully' ,color: 'positive' });
+        } else {
+          const newArticle = await addArticle({ title: editingArticle.value.title, content: editingArticle.value.content });
+          articles.value.push(newArticle);
+          $q.notify({ message: 'Article added successfully' ,color: 'positive' });
+        }
+      } catch {
+        $q.notify({message: 'Failed to save article' ,color: 'negative' });
+      } finally {
+        dialog.value = false; // Ensure the dialog closes regardless of success or failure
+      }
     };
 
     // Delete an article
-    const deleteArticle = (id: number) => {
-      articles.value = articles.value.filter((a) => a.article_id !== id);
-      $q.notify({ type: 'negative', message: 'Article deleted' });
+    const deleteArticleHandler = async (id: number) => {
+      try {
+        await deleteArticle(id);
+        articles.value = articles.value.filter((a) => a.article_id !== id);
+        $q.notify({ message: 'Article deleted' ,color: 'positive' });
+      } catch {
+        $q.notify({ message: 'Failed to delete article' ,color: 'negative' });
+      }
     };
 
-    // Fetch articles (mocked)
-    const fetchArticles = () => {
-      articles.value = [
-        { article_id: 1, title: 'Article 1', content: 'Content 1'},
-        { article_id: 2, title: 'Article 2', content: 'Content 2'},
-      ];
+    // Fetch articles
+    const fetchArticlesHandler = async () => {
+      try {
+        articles.value = await fetchArticles();
+      } catch {
+        $q.notify({ message: 'Failed to fetch articles' ,color: 'negative' });
+      }
     };
 
-    onMounted(fetchArticles);
+    onMounted(fetchArticlesHandler);
 
-    // ✅ Make sure to return `editingArticle` so it's available in the template
     return {
       articles,
       dialog,
@@ -128,8 +142,8 @@ export default defineComponent({
       editableTitle,
       editableContent,
       openDialog,
-      saveArticle,
-      deleteArticle,
+      saveArticle: saveArticleHandler,
+      deleteArticle: deleteArticleHandler,
       columns
     };
   },
